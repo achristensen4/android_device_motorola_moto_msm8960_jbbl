@@ -98,7 +98,7 @@ on start-charging
     exec /system/bin/charge_only_mode
 
 on property:ro.modem.no_wdog_chk=1
-   write /sys/module/modem_8960/parameters/no_wdog_chk 1
+   write /sys/module/modem_8960/parameters/no_wdog_chk 0
 
 on fs
     mount_all /fstab.qcom
@@ -128,7 +128,7 @@ on post-fs
     wait /dev/block/platform/msm_sdcc.1/by-name/pds
     exec /system/bin/mount_pds.sh
 
-    mount ext4 /dev/block/platform/msm_sdcc.1/by-name/system /system ro remount
+    mount ext4 /dev/block/platform/msm_sdcc.1/by-name/system /system rw remount
 
     # Load FIPS kernel module
     exec /system/bin/fips_loader /system/lib/modules
@@ -328,10 +328,7 @@ on boot
     setprop net.tcp.buffersize.edge    16384,32768,65536,4096,16384,32768
     setprop net.tcp.buffersize.gprs    4096,8192,12288,4096,8192,12288
     setprop net.tcp.buffersize.lte     524288,1048576,4194304,262144,524288,2097152
-    setprop net.tcp.buffersize.cdma    4096,12288,24576,4096,12288,24576
-    setprop net.tcp.buffersize.evdo    131072,262144,524288,4096,16384,262144
-    setprop net.tcp.buffersize.evdo_b  131072,262144,704512,4096,16384,262144
-
+    
 # Assign TCP buffer thresholds to be ceiling value of technology maximums
 # Increased technology maximums should be reflected here.
     write /proc/sys/net/core/rmem_max  4194304
@@ -359,7 +356,7 @@ on post-fs-data
 
 #start camera server as daemon
 service qcamerasvr /system/bin/mm-qcamera-daemon
-    class late_start
+    class main
     user media
     group system camera inet input graphics
 
@@ -371,7 +368,6 @@ service thermald /system/bin/thermald
 service mpdecision /system/bin/mpdecision --no_sleep --avg_comp
    user root
    group root system
-   disabled
 
 service whisperd /system/bin/whisperd /dev/ttyHS1
     class core
@@ -381,7 +377,6 @@ service whisperd /system/bin/whisperd /dev/ttyHS1
 
 service kickstart /system/bin/qcks -i /firmware/image/
     oneshot
-    disabled
 
 service qrngd /system/bin/qrngd -f
     class main
@@ -389,7 +384,7 @@ service qrngd /system/bin/qrngd -f
     group root
 
 service qseecomd /system/bin/qseecomd
-    class late_start
+    class main
     user system
     group system
 
@@ -403,7 +398,7 @@ on property:ro.baseband=mdm
     start kickstart
 
 service time_daemon /system/bin/time_daemon
-   class late_start
+   class main
    user root
    group root
 
@@ -436,13 +431,12 @@ on property:persist.log.aplogd.enable=0
 
 service aplogd /system/bin/aplogd
     class main
-    #user log
-    #group log system sdcard_rw sdcard_r media_rw mount
+    user log
+    group log system sdcard_rw sdcard_r media_rw mount
     # The user and group definitions above are intentionally disabled and left
     # only as documentation. It actually starts as root and immediately drops
     # to log plus those groups after preserving CAP_SYS_ADMIN, which is required
     # for kernel logging.
-    disabled
 
 on property:persist.sys.diag_mdlog.on=1
     start diag_mdlog
@@ -453,10 +447,9 @@ on property:persist.sys.diag_mdlog.on=0
 service diag_mdlog /system/bin/logwrapper /system/bin/diag_mdlog-wrap
     class main
     # We are having permissions issues on JB so far with this, so must run as root.
-    #user system
+    user system
     user root
     group log system sdcard_rw sdcard_r media_rw qcom_diag
-    disabled
 
 service modemlog /system/bin/modemlog
    class core
@@ -477,7 +470,6 @@ on property:ro.secure=0
 service ftmipcd /system/bin/ftmipcd
     user radio
     group radio inet qcom_diag
-    disabled
     oneshot
 
 on property:ro.bootmode=factory
@@ -497,26 +489,25 @@ service start_fd  /system/bin/sh /system/bin/am startservice -a com.motorola.fas
 
 # Define the trigger to stop FastDormancy service
 service stop_fd  /system/bin/sh /system/bin/am broadcast -a  com.motorola.fastdormancy.stop
-    disabled
     user system
     group system
     oneshot
 
 #Trigger FastDormancy service start when network type is changed to UMTS
 on property:gsm.network.type="UMTS"
-    start start_fd
+    stop start_fd
 
 on property:gsm.network.type="HSDPA"
-    start start_fd
+    stop start_fd
 
 on property:gsm.network.type="HSUPA"
-    start start_fd
+    stop start_fd
 
 on property:gsm.network.type="HSPA"
-    start start_fd
+    stop start_fd
 
 on property:gsm.network.type="HSPAP"
-    start start_fd
+    stop start_fd
 
 #Trigger FastDormancy service stop when network is unknow or CDMA
 #GSM, GPRS, EDGE, and HSPAP is not handled in order to avoid the service to be started and stopped back and force.
@@ -532,18 +523,6 @@ on property:gsm.network.type="CDMA-IS95B"
 on property:gsm.network.type="1xRTT"
     start stop_fd
 
-on property:gsm.network.type="EvDo-rev.0"
-    start stop_fd
-
-on property:gsm.network.type="EvDo-rev.A"
-    start stop_fd
-
-on property:gsm.network.type="EvDo-rev.B"
-    start stop_fd
-
-on property:gsm.network.type="eHRPD"
-    start stop_fd
-
 on property:gsm.network.type="LTE"
     start stop_fd
 
@@ -557,5 +536,4 @@ on property:service.adb.root=1
 service bugreport /system/bin/dumpstate -d -p -B \
         -o /data/data/com.android.shell/files/bugreports/bugreport
     class main
-    disabled
     oneshot
